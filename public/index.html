@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#0052ff"/>
+  <meta name="description" content="WhyBot — post-trade explainability for AI trading agents on Bitget."/>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"/>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+  <title>WhyBot — Why did the bot do that?</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0052ff', ink: '#0a0b0d', muted: '#7c828a',
+            hairline: '#dee1e6', soft: '#f7f7f7', dark: '#0a0b0d', card: '#16181c',
+            up: '#05b169', down: '#cf202f',
+          },
+          borderRadius: { '2xl': '24px' },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { font-size: 18px; scroll-behavior: smooth; }
+    body { font-family: Inter, sans-serif; }
+    @media (min-width: 1280px) { html { font-size: 19px; } }
+    .toast { animation: slide-in 0.25s ease; }
+    @keyframes slide-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+    details summary { list-style: none; cursor: pointer; }
+    details summary::-webkit-details-marker { display: none; }
+    .tab-btn.active { background: #0052ff; color: white; border-color: #0052ff; }
+    .coin-row.active { background: #eff4ff; border-color: #0052ff; box-shadow: inset 3px 0 0 #0052ff; }
+    .section-link.active { color: #0052ff; border-color: #0052ff; }
+  </style>
+</head>
+<body class="bg-soft text-ink min-h-screen">
+
+<div id="toast" class="hidden fixed bottom-6 right-6 z-50 toast max-w-md px-5 py-4 rounded-xl bg-dark text-white text-sm shadow-lg border border-white/10"></div>
+
+<!-- Top bar -->
+<header class="fixed top-0 inset-x-0 z-40 bg-dark text-white border-b border-white/10">
+  <div class="max-w-[1600px] mx-auto px-4 lg:px-8 h-14 flex items-center justify-between gap-4">
+    <div class="min-w-0 flex-1">
+      <p class="font-semibold text-lg leading-tight truncate">WhyBot</p>
+      <p class="text-xs text-gray-400 hidden sm:block truncate">
+        Bot: <span id="headerAgentName" class="text-gray-200">Live Regime Router</span>
+        · Data: Bitget · <span id="headerAgentMode" class="text-gray-500">report card</span>
+      </p>
+    </div>
+    <div class="hidden md:flex items-center gap-2 shrink-0">
+      <label class="text-xs text-gray-400 sr-only" for="agentFilter">Agent</label>
+      <select id="agentFilter" class="text-sm bg-white/10 text-white border border-white/20 rounded-lg px-3 py-2 max-w-[200px] truncate" title="Filter dashboard by agent">
+        <option value="">All agents</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button id="refreshBtn" type="button" class="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 text-sm hover:bg-white/20" title="Reload saved data">
+        <span class="material-symbols-outlined text-lg">refresh</span>
+        Refresh
+      </button>
+      <button id="analyzeBtn" type="button" class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-sm font-semibold hover:bg-blue-700">
+        <span class="material-symbols-outlined text-lg">play_arrow</span>
+        Check market
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Sticky steps + quick stats -->
+<div class="fixed top-14 inset-x-0 z-30 bg-white border-b border-hairline shadow-sm">
+  <div class="max-w-[1600px] mx-auto px-4 lg:px-8 py-3">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      <ol class="flex flex-wrap gap-2 text-base">
+        <li class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary font-medium">
+          <span class="w-5 h-5 rounded-full bg-primary text-white text-xs flex items-center justify-center">1</span>
+          Check market
+        </li>
+        <li class="hidden sm:flex items-center text-muted">→</li>
+        <li class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-soft border border-hairline">
+          <span class="w-5 h-5 rounded-full bg-white border border-hairline text-xs flex items-center justify-center">2</span>
+          Pick a coin
+        </li>
+        <li class="hidden sm:flex items-center text-muted">→</li>
+        <li class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-soft border border-hairline">
+          <span class="w-5 h-5 rounded-full bg-white border border-hairline text-xs flex items-center justify-center">3</span>
+          Read the report
+        </li>
+      </ol>
+      <div class="flex flex-wrap gap-x-5 gap-y-1 text-base text-muted">
+        <span>Updated <strong id="lastUpdated" class="text-ink font-mono">—</strong></span>
+        <span><strong id="statSymbols" class="text-ink">—</strong> coins</span>
+        <span>Avg safety <strong id="statRisk" class="text-ink font-mono">—</strong></span>
+        <span>Problems <strong id="statFlagged" class="text-down font-mono">—</strong></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="max-w-[1600px] mx-auto px-4 lg:px-8 pt-[8.5rem] pb-16">
+
+  <div id="warningsBox" class="hidden mb-4 p-4 rounded-xl border border-down/30 bg-red-50 text-sm"></div>
+
+  <!-- Main workspace: coins + report -->
+  <div class="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 mb-8">
+
+    <!-- Coin picker -->
+    <aside id="section-live" class="rounded-2xl border border-hairline bg-white overflow-hidden xl:sticky xl:top-[8.5rem] xl:self-start xl:max-h-[calc(100vh-9.5rem)] xl:flex xl:flex-col">
+      <div class="p-4 border-b border-hairline bg-white shrink-0">
+        <h2 class="font-semibold text-xl mb-1">Coins</h2>
+        <p class="text-base text-muted mb-3">Latest check for each pair. Blue dot = full Bitget depth loaded.</p>
+        <input id="coinSearch" type="search" placeholder="Filter coins…" class="w-full text-base border border-hairline rounded-xl px-4 py-3"/>
+      </div>
+      <div id="coinList" class="divide-y divide-hairline overflow-y-auto flex-1 min-h-[240px] max-h-[420px] xl:max-h-none">
+        <p class="p-6 text-sm text-muted text-center">Loading…</p>
+      </div>
+      <div class="p-3 border-t border-hairline bg-soft shrink-0 flex flex-wrap gap-2">
+        <a id="downloadBtn" href="/api/export/log" download="api-call-log.json" class="flex-1 text-center text-xs px-3 py-2 rounded-lg border border-hairline bg-white hover:bg-soft">Proof log</a>
+        <button id="downloadAllCardsBtn" type="button" class="flex-1 text-xs px-3 py-2 rounded-lg border border-hairline bg-white hover:bg-soft">All PNGs</button>
+      </div>
+    </aside>
+
+    <!-- Report -->
+    <section id="detailPanel" class="min-w-0">
+      <div id="emptyState" class="rounded-2xl border border-dashed border-hairline bg-white p-10 lg:p-14 text-center">
+        <span class="material-symbols-outlined text-5xl text-muted mb-4">touch_app</span>
+        <p class="text-xl font-semibold mb-2">Pick a coin from the list</p>
+        <p class="text-muted max-w-md mx-auto">Or click <strong>Check market</strong> first to pull live prices, order book, and trade flow from Bitget.</p>
+      </div>
+      <div id="detailContent" class="hidden"></div>
+    </section>
+  </div>
+
+  <!-- Analytics (collapsed by default on mobile feel, open on desktop) -->
+  <details id="section-stats" class="mb-5 rounded-2xl border border-hairline bg-white overflow-hidden group" open>
+    <summary class="px-5 py-4 font-semibold flex items-center justify-between gap-3 hover:bg-soft">
+      <span>Overview &amp; trends</span>
+      <span class="text-sm text-muted font-normal hidden sm:inline">Total checks: <span id="statDecisions">—</span> · <span id="statBitgetPairs">Bitget pairs: —</span></span>
+      <span class="material-symbols-outlined text-muted group-open:rotate-180 transition-transform">expand_more</span>
+    </summary>
+    <div class="p-5 pt-0 border-t border-hairline space-y-5">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="p-4 rounded-xl bg-soft border border-hairline">
+          <p class="text-sm text-muted mb-3 font-medium">What the bot picked</p>
+          <div id="actionBars" class="space-y-2 text-sm"></div>
+        </div>
+        <div class="p-4 rounded-xl bg-soft border border-hairline">
+          <p class="text-sm text-muted mb-3 font-medium">Safety grades</p>
+          <div id="gradeBars" class="space-y-2 text-sm"></div>
+        </div>
+      </div>
+      <div class="p-4 rounded-xl border border-hairline">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <p class="font-medium">Safety score over time</p>
+          <select id="trendSymbol" class="text-sm border rounded-lg px-3 py-2 bg-white">
+            <option value="">All coins</option>
+          </select>
+        </div>
+        <canvas id="trendChart" height="160" class="w-full"></canvas>
+        <p class="text-xs text-muted mt-2">Higher = safer decision. Green/red dots = buy/sell checks.</p>
+      </div>
+    </div>
+  </details>
+
+  <!-- History -->
+  <section id="section-history" class="rounded-2xl border border-hairline bg-white overflow-hidden">
+    <div class="p-4 border-b border-hairline flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h2 class="font-semibold text-lg">Past checks</h2>
+        <p class="text-sm text-muted">Search and filter older decisions · <kbd class="px-1 py-0.5 bg-soft rounded border text-xs">j</kbd>/<kbd class="px-1 py-0.5 bg-soft rounded border text-xs">k</kbd> to move</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <select id="symbolFilter" class="text-sm border rounded-lg px-3 py-2 bg-white">
+          <option value="">All coins</option>
+        </select>
+        <select id="actionFilter" class="text-sm border rounded-lg px-3 py-2 bg-white">
+          <option value="">All actions</option>
+          <option value="BUY">Buy</option>
+          <option value="SELL">Sell</option>
+          <option value="HOLD">Hold</option>
+          <option value="SKIP">Skip</option>
+        </select>
+        <select id="sortFilter" class="text-sm border rounded-lg px-3 py-2 bg-white">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="safest">Safest</option>
+          <option value="riskiest">Riskiest</option>
+        </select>
+      </div>
+    </div>
+    <div class="px-4 py-3 border-b border-hairline bg-soft flex flex-wrap gap-3 items-center">
+      <input id="searchBox" type="search" placeholder="Search thesis, notes, coin…" class="flex-1 min-w-[200px] text-sm border border-hairline rounded-xl px-3 py-2.5 bg-white"/>
+      <label class="flex items-center gap-2 text-sm text-muted cursor-pointer whitespace-nowrap">
+        <input type="checkbox" id="problemsOnly" class="rounded"/> Problems only
+      </label>
+    </div>
+    <div id="timeline" class="max-h-[480px] overflow-y-auto"></div>
+  </section>
+
+  <details class="mt-6 rounded-2xl border border-hairline bg-white text-sm">
+    <summary class="px-5 py-4 font-semibold">Connect your own agent</summary>
+    <div class="px-5 pb-5 space-y-4 text-muted">
+      <p class="text-base text-ink">WhyBot does not run your bot — it <strong>records and grades</strong> each decision. POST one JSON object after every trade (or skip/hold).</p>
+      <pre class="text-xs bg-soft border border-hairline rounded-xl p-4 overflow-x-auto font-mono text-ink"><code>curl -X POST http://localhost:3847/api/decisions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "my-bitget-bot",
+    "agentName": "My Strategy Bot",
+    "thesis": "Flat market — wait",
+    "reasoning": "24h move small, RSI neutral.",
+    "confidence": 70,
+    "inputs": { "symbol": "BTCUSDT", "price": 63000 },
+    "action": { "type": "HOLD", "symbol": "BTCUSDT" },
+    "tags": ["LIVE"]
+  }'</code></pre>
+      <p>Node/TS agents can use <code class="text-xs bg-soft px-1 rounded">AutopsySession</code> from <code class="text-xs bg-soft px-1 rounded">src/core/logger.ts</code>. See <a href="https://github.com/AshThunder/whybot#connect-your-agent" class="text-primary underline">README → Connect your agent</a>.</p>
+      <p class="text-xs"><strong>Check market</strong> runs the built-in demo bot only (<span id="connectBuiltInName">Live Regime Router</span>). External agents use <code class="text-xs">POST /api/decisions</code>.</p>
+    </div>
+  </details>
+
+  <details class="mt-4 rounded-2xl border border-hairline bg-white text-sm">
+    <summary class="px-5 py-4 font-semibold">What do these words mean?</summary>
+    <dl class="px-5 pb-5 grid sm:grid-cols-2 gap-x-6 gap-y-3 text-muted">
+      <div><dt class="font-medium text-ink">Safety score</dt><dd>0–100 report card. Higher = safer bot choice.</dd></div>
+      <div><dt class="font-medium text-ink">HOLD / BUY / SKIP</dt><dd>What the bot wanted. Paper only — no real trades.</dd></div>
+      <div><dt class="font-medium text-ink">Momentum (RSI)</dt><dd>Our math from Bitget price history. Hot or cold market.</dd></div>
+      <div><dt class="font-medium text-ink">Order book / flow / OI</dt><dd>Live public Bitget data. Re-check a coin to refresh.</dd></div>
+      <div><dt class="font-medium text-ink">Proof log</dt><dd>JSON of real API calls for hackathon judges.</dd></div>
+      <div><dt class="font-medium text-ink">Download PNG</dt><dd>Shareable card image of one decision.</dd></div>
+    </dl>
+  </details>
+</main>
+
+<script src="/plain-english.js"></script>
+<script src="/card-png.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
