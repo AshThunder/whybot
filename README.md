@@ -10,7 +10,7 @@ Every trading agent fails silently. WhyBot records *why* an agent made each deci
 
 ## Thesis
 
-AI trading agents make opaque decisions. Builders and judges can't verify whether an agent's action matched its thesis, respected risk limits, or used signals correctly. WhyBot hooks into the Agent Hub decision loop and produces a verifiable audit trail: **inputs → reasoning → action → outcome → risk score**.
+AI trading agents make opaque decisions. **Agent developers and operators** can't easily verify whether an agent's action matched its thesis, respected risk limits, or used signals correctly. WhyBot hooks into the Agent Hub decision loop and produces a verifiable audit trail: **inputs → reasoning → action → outcome → risk score**.
 
 ## Quick Start
 
