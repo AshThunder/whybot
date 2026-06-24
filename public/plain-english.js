@@ -182,8 +182,93 @@ window.PlainEnglish = (() => {
     return bullets;
   }
 
+  function fmtPrice(n) {
+    if (n == null) return '—';
+    return '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 });
+  }
+
+  /** Structured “Why” block — shared by dashboard detail and PNG cards */
+  function buildWhyContent(d) {
+    const inp = d.inputs ?? {};
+    const sent = inp.sentiment ?? {};
+    const tech = inp.technical ?? {};
+    const bitget = inp.bitget;
+    const actionType = d.action?.type ?? 'HOLD';
+    const change24h = change24hFromSentiment(sent) ?? '—';
+
+    const signals = [
+      { label: 'Price (Bitget)', value: fmtPrice(inp.price), hint: 'Live spot price' },
+      {
+        label: '24h move',
+        value: change24h,
+        hint: change24h !== '—' && Math.abs(parseFloat(change24h)) < 1.5 ? 'Pretty flat' : 'Trending',
+      },
+      {
+        label: 'Momentum (RSI)',
+        value: tech.rsi != null ? String(tech.rsi) : '—',
+        hint: (rsiHint(tech.rsi) || 'Neutral zone').replace(/^ · /, ''),
+      },
+      { label: 'Trend', value: trendLabel(tech.trend), hint: trendHint(tech.trend, tech.rsi) },
+      {
+        label: 'Funding rate',
+        value: sent.fundingRate != null ? `${(sent.fundingRate * 100).toFixed(4)}%` : '—',
+        hint: fundingHint(sent.fundingRate) || 'Futures fee',
+      },
+      {
+        label: 'Bot confidence',
+        value: d.confidence != null ? `${d.confidence}%` : '—',
+        hint:
+          d.confidence == null
+            ? 'Not recorded'
+            : d.confidence >= 75
+              ? 'Fairly sure'
+              : d.confidence >= 60
+                ? 'Moderate'
+                : 'Low conviction',
+      },
+    ];
+
+    const bitgetRows = bitget
+      ? [
+          bitget.orderBookLabel && {
+            label: 'Order book',
+            value: `${bitget.orderBookBuyPct ?? '—'}% bids`,
+            hint: bitget.orderBookLabel,
+          },
+          bitget.tradeFlowLabel && {
+            label: 'Recent trades',
+            value: `${bitget.tradeFlowBuyPct ?? '—'}% buys`,
+            hint: bitget.tradeFlowLabel,
+          },
+          bitget.basisLabel && {
+            label: 'Spot vs futures',
+            value:
+              bitget.basisPct != null
+                ? `${bitget.basisPct >= 0 ? '+' : ''}${Number(bitget.basisPct).toFixed(3)}%`
+                : '—',
+            hint: bitget.basisLabel,
+          },
+          bitget.openInterestLabel && {
+            label: 'Open interest',
+            value: bitget.openInterest
+              ? Number(bitget.openInterest).toLocaleString(undefined, { maximumFractionDigits: 0 })
+              : '—',
+            hint: bitget.openInterestLabel,
+          },
+        ].filter(Boolean)
+      : [];
+
+    return {
+      headline: simpleThesis(d.thesis),
+      reasoning: d.reasoning ?? '',
+      signals,
+      bitgetRows,
+      bullets: decisionBullets(d.thesis, actionType),
+    };
+  }
+
   return {
-    simpleThesis, actionHeadline, actionPlain, actionVerb, explainWhy,
+    simpleThesis, actionHeadline, actionPlain, actionVerb, explainWhy, buildWhyContent,
     rsiHint, safetyWord, dimName, flagText, trendLabel, trendHint,
     fundingHint, change24hFromSentiment, decisionBullets,
   };

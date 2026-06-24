@@ -2,6 +2,7 @@
 # Example: connect an external agent to WhyBot
 # Usage: ./examples/post-decision.sh [base-url]
 # Default base: http://localhost:3847
+# Production:  ./examples/post-decision.sh https://whybotai.vercel.app
 
 BASE="${1:-http://localhost:3847}"
 

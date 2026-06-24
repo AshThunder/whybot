@@ -37,6 +37,7 @@
     .tab-btn.active { background: #0052ff; color: white; border-color: #0052ff; }
     .coin-row.active { background: #eff4ff; border-color: #0052ff; box-shadow: inset 3px 0 0 #0052ff; }
     .section-link.active { color: #0052ff; border-color: #0052ff; }
+    .coin-icon { position: relative; }
   </style>
 </head>
 <body class="bg-soft text-ink min-h-screen">
@@ -64,7 +65,7 @@
         <span class="material-symbols-outlined text-lg">refresh</span>
         Refresh
       </button>
-      <button id="analyzeBtn" type="button" class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-sm font-semibold hover:bg-blue-700">
+      <button id="analyzeBtn" type="button" data-analyze-btn class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-sm font-semibold hover:bg-blue-700">
         <span class="material-symbols-outlined text-lg">play_arrow</span>
         Check market
       </button>
@@ -130,7 +131,11 @@
       <div id="emptyState" class="rounded-2xl border border-dashed border-hairline bg-white p-10 lg:p-14 text-center">
         <span class="material-symbols-outlined text-5xl text-muted mb-4">touch_app</span>
         <p class="text-xl font-semibold mb-2">Pick a coin from the list</p>
-        <p class="text-muted max-w-md mx-auto">Or click <strong>Check market</strong> first to pull live prices, order book, and trade flow from Bitget.</p>
+        <p class="text-muted max-w-md mx-auto">Or run a live check first to pull prices, order book, and trade flow from Bitget.</p>
+        <button id="emptyAnalyzeBtn" type="button" data-analyze-btn class="inline-flex items-center justify-center gap-2 mt-6 px-5 py-3 rounded-xl bg-primary text-white text-base font-semibold hover:bg-blue-700">
+          <span class="material-symbols-outlined text-lg">play_arrow</span>
+          Check market
+        </button>
       </div>
       <div id="detailContent" class="hidden"></div>
     </section>
@@ -206,7 +211,7 @@
     <summary class="px-5 py-4 font-semibold">Connect your own agent</summary>
     <div class="px-5 pb-5 space-y-4 text-muted">
       <p class="text-base text-ink">WhyBot does not run your bot — it <strong>records and grades</strong> each decision. POST one JSON object after every trade (or skip/hold).</p>
-      <pre class="text-xs bg-soft border border-hairline rounded-xl p-4 overflow-x-auto font-mono text-ink"><code>curl -X POST http://localhost:3847/api/decisions \
+      <pre class="text-xs bg-soft border border-hairline rounded-xl p-4 overflow-x-auto font-mono text-ink"><code>curl -X POST https://whybotai.vercel.app/api/decisions \
   -H "Content-Type: application/json" \
   -d '{
     "agentId": "my-bitget-bot",
@@ -236,6 +241,7 @@
   </details>
 </main>
 
+<script src="/coin-icons.js"></script>
 <script src="/plain-english.js"></script>
 <script src="/card-png.js"></script>
 <script src="/app.js"></script>

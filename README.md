@@ -6,6 +6,8 @@ Every trading agent fails silently. WhyBot records *why* an agent made each deci
 
 ![CI](https://github.com/AshThunder/whybot/actions/workflows/ci.yml/badge.svg)
 
+**Live demo:** [whybotai.vercel.app](https://whybotai.vercel.app/)
+
 ## Thesis
 
 AI trading agents make opaque decisions. Builders and judges can't verify whether an agent's action matched its thesis, respected risk limits, or used signals correctly. WhyBot hooks into the Agent Hub decision loop and produces a verifiable audit trail: **inputs → reasoning → action → outcome → risk score**.
@@ -42,7 +44,11 @@ A local `.env` file is included (gitignored). Copy from `.env.example` if missin
 
 WhyBot is a **report card layer** — it does not run your trading bot. After each decision, send one payload; WhyBot scores it and shows it on the dashboard.
 
+**Works with Qwen, Bitget Agent Hub, or any bot that can HTTP POST** — your agent keeps its own strategy; WhyBot only records and scores each decision.
+
 ### Option A — HTTP (any language)
+
+**Local** (`npm run dev`):
 
 ```bash
 curl -X POST http://localhost:3847/api/decisions \
@@ -73,10 +79,40 @@ curl -X POST http://localhost:3847/api/decisions \
 
 Returns `201` with the decision plus an auto **safety score** (you do not send `risk`).
 
+**Production (Vercel)** — swap in your deploy URL:
+
+```bash
+curl -X POST https://whybotai.vercel.app/api/decisions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "my-qwen-bot",
+    "agentName": "My Qwen Strategy Bot",
+    "thesis": "BTC range-bound — no edge",
+    "reasoning": "24h move flat, RSI 52, funding neutral. Waiting.",
+    "confidence": 72,
+    "inputs": {
+      "symbol": "BTCUSDT",
+      "price": 63000,
+      "technical": { "rsi": 52, "trend": "neutral" },
+      "sentiment": { "fundingRate": 0.0001 }
+    },
+    "action": { "type": "HOLD", "symbol": "BTCUSDT" },
+    "tags": ["LIVE"]
+  }'
+```
+
+Or use the example script with your live URL:
+
+```bash
+./examples/post-decision.sh https://whybotai.vercel.app
+```
+
 Filter in the dashboard header (**All agents** dropdown) or via API:
 
 ```bash
 curl "http://localhost:3847/api/decisions?agentId=my-bitget-bot"
+# production:
+curl "https://whybotai.vercel.app/api/decisions?agentId=my-qwen-bot"
 ```
 
 See also: [`examples/post-decision.sh`](./examples/post-decision.sh)
@@ -126,7 +162,7 @@ Optional: `mcpToolCalls` (Bitget API proof), `outcome` (PnL if executed), `tags`
 | Button / endpoint | What it runs |
 |-------------------|--------------|
 | **Check market** (`POST /api/analyze`) | Built-in **Live Regime Router** — reads Bitget public APIs + simple rules in `src/agent/signals.ts` |
-| **Your integration** (`POST /api/decisions`) | **Your** Bitget Agent Hub bot — any strategy, any language |
+| **Your integration** (`POST /api/decisions`) | **Your** agent — Qwen, Bitget Agent Hub MCP, custom Python/TS, any language |
 
 Rename the built-in bot in `.env`:
 
@@ -164,7 +200,7 @@ The app runs entirely on Vercel: static dashboard + serverless API.
 | `BITGET_SECRET_KEY` | optional |
 | `BITGET_PASSPHRASE` | optional |
 
-5. Deploy — your site will be `https://your-project.vercel.app`
+5. Deploy — live site: [whybotai.vercel.app](https://whybotai.vercel.app/)
 
 ### How Vercel hosting works
 
@@ -174,7 +210,7 @@ The app runs entirely on Vercel: static dashboard + serverless API.
 | API (`/api/*`) | Serverless function (`api/index.ts`) |
 | Database | SQLite in `/tmp` (ephemeral between cold starts) |
 
-**Important for judges:** On Vercel, click **Check market now** to pull live Bitget data. History may reset after idle time — that is normal for the free serverless tier. For persistent history, run locally or add Turso/Postgres later.
+**Important for judges:** On [whybotai.vercel.app](https://whybotai.vercel.app/), click **Check market** to pull live Bitget data. History may reset after idle time — that is normal for the free serverless tier. For persistent history, run locally or add Turso/Postgres later.
 
 ### Manual deploy
 
@@ -274,7 +310,7 @@ Dashboard                   ← timeline + detail + PNG cards
 | Artifact | Location |
 |----------|----------|
 | GitHub repo | This repository |
-| Live demo | Vercel deploy or `npm run dev` |
+| Live demo | [whybotai.vercel.app](https://whybotai.vercel.app/) |
 | API call log | `logs/api-call-log.json` or dashboard download |
 | CI | `.github/workflows/ci.yml` |
 

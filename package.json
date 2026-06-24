@@ -25,6 +25,7 @@
     "hackathon"
   ],
   "license": "MIT",
+  "homepage": "https://whybotai.vercel.app",
   "repository": {
     "type": "git",
     "url": "https://github.com/AshThunder/whybot.git"

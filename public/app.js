@@ -1,6 +1,20 @@
 let decisions = [];
 let selectedId = null;
 let lastCount = 0;
+const ANALYZE_BTN_IDLE = '<span class="material-symbols-outlined text-lg">play_arrow</span> Check market';
+const ANALYZE_BTN_BUSY = '<span class="material-symbols-outlined text-lg animate-spin">progress_activity</span> Checking…';
+
+function analyzeButtons() {
+  return [...document.querySelectorAll('[data-analyze-btn]')];
+}
+
+function setAnalyzeButtons(busy) {
+  for (const btn of analyzeButtons()) {
+    btn.disabled = busy;
+    btn.innerHTML = busy ? ANALYZE_BTN_BUSY : ANALYZE_BTN_IDLE;
+  }
+}
+
 let analyzeBusy = false;
 let summary = { latest: [], warnings: [] };
 let trends = [];
@@ -212,9 +226,14 @@ function renderCoinList() {
     return `
       <button type="button" data-pick="${esc(c.id)}" class="coin-row w-full text-left px-5 py-4 hover:bg-soft transition-colors border-l-[3px] border-transparent ${active ? 'active' : ''}">
         <div class="flex items-start justify-between gap-2 mb-1.5">
-          <div class="flex items-center gap-2 min-w-0">
-            <span class="font-bold text-xl">${coinLabel(c.symbol)}</span>
-            ${hasDepth ? '<span class="w-2.5 h-2.5 rounded-full bg-primary shrink-0" title="Bitget depth loaded"></span>' : '<span class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" title="Needs re-check"></span>'}
+          <div class="flex items-center gap-2.5 min-w-0">
+            ${window.CoinIcons?.markup(c.symbol, 36) ?? ''}
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-xl">${coinLabel(c.symbol)}</span>
+                ${hasDepth ? '<span class="w-2.5 h-2.5 rounded-full bg-primary shrink-0" title="Bitget depth loaded"></span>' : '<span class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" title="Needs re-check"></span>'}
+              </div>
+            </div>
           </div>
           <span class="text-sm font-bold px-2.5 py-1 rounded-full shrink-0 ${actionStyle(c.action)}">${c.action}</span>
         </div>
@@ -255,8 +274,11 @@ function renderTimeline() {
     const active = d.id === selectedId;
     return `
       <button type="button" data-id="${d.id}" class="w-full text-left p-4 border-b border-hairline ${active ? 'bg-blue-50 border-l-4 border-l-primary' : 'hover:bg-soft'}">
-        <div class="flex justify-between mb-1.5">
-          <span class="text-xs font-bold ${actionStyle(d.action.type)} px-2 py-0.5 rounded">${d.action.type} ${coinLabel(d.action.symbol)}</span>
+        <div class="flex justify-between mb-1.5 items-center gap-2">
+          <span class="flex items-center gap-2 min-w-0">
+            ${window.CoinIcons?.markup(d.action.symbol, 22) ?? ''}
+            <span class="text-xs font-bold ${actionStyle(d.action.type)} px-2 py-0.5 rounded">${d.action.type} ${coinLabel(d.action.symbol)}</span>
+          </span>
           <span class="text-xs font-mono ${d.risk.overall >= 75 ? 'text-up' : d.risk.overall < 55 ? 'text-down' : 'text-muted'}">${d.risk.overall}/100</span>
         </div>
         <p class="text-sm line-clamp-2 mb-1">${esc(window.PlainEnglish?.simpleThesis(d.thesis) ?? d.thesis)}</p>
@@ -321,78 +343,52 @@ function renderBitgetPanel(b, symbol) {
 }
 
 function renderWhyDetail(d) {
-  const inp = d.inputs ?? {};
-  const sent = inp.sentiment ?? {};
-  const tech = inp.technical ?? {};
-  const bitget = inp.bitget;
   const pe = window.PlainEnglish;
-  const headline = pe.simpleThesis(d.thesis);
-  const change24h = pe.change24hFromSentiment(sent) ?? '—';
-  const priceStr = inp.price != null
-    ? '$' + Number(inp.price).toLocaleString(undefined, { maximumFractionDigits: inp.price < 1 ? 6 : 2 })
-    : '—';
+  const why = pe.buildWhyContent(d);
 
-  const signals = [
-    { label: 'Price (Bitget)', value: priceStr, hint: 'Live spot price' },
-    { label: '24h move', value: change24h, hint: change24h !== '—' && Math.abs(parseFloat(change24h)) < 1.5 ? 'Pretty flat' : 'Trending' },
-    { label: 'Momentum (RSI)', value: tech.rsi != null ? String(tech.rsi) : '—', hint: (pe.rsiHint(tech.rsi) || 'Neutral zone').replace(/^ · /, '') },
-    { label: 'Trend', value: pe.trendLabel(tech.trend), hint: pe.trendHint(tech.trend, tech.rsi) },
-    { label: 'Funding rate', value: sent.fundingRate != null ? (sent.fundingRate * 100).toFixed(4) + '%' : '—', hint: pe.fundingHint(sent.fundingRate) || 'Futures fee' },
-    { label: 'Bot confidence', value: d.confidence + '%', hint: d.confidence >= 75 ? 'Fairly sure' : d.confidence >= 60 ? 'Moderate' : 'Low conviction' },
-  ];
+  const signalsHtml = why.signals.map(s => `
+    <div class="p-3 rounded-xl bg-white border border-hairline">
+      <span class="text-xs text-muted block">${esc(s.label)}</span>
+      <strong class="font-mono text-base block">${esc(s.value)}</strong>
+      <span class="text-xs text-muted">${esc(s.hint)}</span>
+    </div>`).join('');
 
-  const bullets = pe.decisionBullets(d.thesis, d.action.type);
-
-  let bitgetBlock = '';
-  if (bitget) {
-    const rows = [
-      bitget.orderBookLabel && { label: 'Order book', value: `${bitget.orderBookBuyPct ?? '—'}% bids`, hint: bitget.orderBookLabel },
-      bitget.tradeFlowLabel && { label: 'Recent trades', value: `${bitget.tradeFlowBuyPct ?? '—'}% buys`, hint: bitget.tradeFlowLabel },
-      bitget.basisLabel && { label: 'Spot vs futures', value: bitget.basisPct != null ? `${bitget.basisPct >= 0 ? '+' : ''}${Number(bitget.basisPct).toFixed(3)}%` : '—', hint: bitget.basisLabel },
-      bitget.openInterestLabel && { label: 'Open interest', value: bitget.openInterest ? Number(bitget.openInterest).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—', hint: bitget.openInterestLabel },
-    ].filter(Boolean);
-    if (rows.length) {
-      bitgetBlock = `
+  const bitgetBlock = why.bitgetRows.length
+    ? `
         <div>
           <p class="text-sm font-semibold text-muted mb-2">Bitget market depth</p>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            ${rows.map(r => `
+            ${why.bitgetRows.map(r => `
               <div class="p-3 rounded-xl bg-blue-50 border border-primary/15">
                 <span class="text-xs text-muted block">${esc(r.label)}</span>
                 <strong class="font-mono text-base block">${esc(r.value)}</strong>
                 <span class="text-xs text-muted">${esc(r.hint)}</span>
               </div>`).join('')}
           </div>
-        </div>`;
-    }
-  }
+        </div>`
+    : '';
 
   return `
     <div class="p-5 rounded-xl bg-soft border border-hairline space-y-5">
       <div>
-        <p class="text-lg font-semibold mb-2">${esc(headline)}</p>
-        <p class="text-base leading-relaxed text-ink/90">${esc(d.reasoning)}</p>
+        <p class="text-lg font-semibold mb-2">${esc(why.headline)}</p>
+        <p class="text-base leading-relaxed text-ink/90">${esc(why.reasoning)}</p>
       </div>
 
       <div>
         <p class="text-sm font-semibold text-muted mb-2">Signals the bot looked at</p>
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          ${signals.map(s => `
-            <div class="p-3 rounded-xl bg-white border border-hairline">
-              <span class="text-xs text-muted block">${esc(s.label)}</span>
-              <strong class="font-mono text-base block">${esc(s.value)}</strong>
-              <span class="text-xs text-muted">${esc(s.hint)}</span>
-            </div>`).join('')}
+          ${signalsHtml}
         </div>
       </div>
 
       ${bitgetBlock}
 
-      ${bullets.length ? `
+      ${why.bullets.length ? `
         <div>
           <p class="text-sm font-semibold text-muted mb-2">How the bot decided</p>
           <ul class="space-y-1.5 text-base list-disc pl-5 marker:text-primary">
-            ${bullets.map(b => `<li>${esc(b)}</li>`).join('')}
+            ${why.bullets.map(b => `<li>${esc(b)}</li>`).join('')}
           </ul>
         </div>` : ''}
     </div>`;
@@ -445,6 +441,7 @@ function renderDetail(d, compare) {
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div class="flex items-center gap-3 mb-2">
+              ${window.CoinIcons?.markup(d.action.symbol, 48) ?? ''}
               <h2 class="text-4xl font-bold">${coinLabel(d.action.symbol)}</h2>
               <span class="text-base font-bold px-3.5 py-1.5 rounded-full ${actionStyle(d.action.type)}">${d.action.type}</span>
             </div>
@@ -699,11 +696,9 @@ async function runAnalyze(symbols) {
     toast('Already checking — wait a moment', false);
     return;
   }
-  const btn = $('analyzeBtn');
   const single = symbols?.length === 1;
   analyzeBusy = true;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-symbols-outlined text-lg animate-spin">progress_activity</span> Checking…';
+  setAnalyzeButtons(true);
   try {
     const body = symbols?.length ? { symbols } : undefined;
     const res = await api('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : '{}' });
@@ -717,8 +712,7 @@ async function runAnalyze(symbols) {
     toast(msg, false);
   } finally {
     analyzeBusy = false;
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlined text-lg">play_arrow</span> Check market';
+    setAnalyzeButtons(false);
   }
 }
 
@@ -731,7 +725,9 @@ function navigateTimeline(dir) {
 }
 
 $('refreshBtn')?.addEventListener('click', () => refresh(false));
-$('analyzeBtn').addEventListener('click', () => runAnalyze());
+for (const btn of analyzeButtons()) {
+  btn.addEventListener('click', () => runAnalyze());
+}
 $('downloadAllCardsBtn')?.addEventListener('click', downloadAllCards);
 $('symbolFilter').addEventListener('change', () => refresh(false));
 $('agentFilter')?.addEventListener('change', () => refresh(false));
